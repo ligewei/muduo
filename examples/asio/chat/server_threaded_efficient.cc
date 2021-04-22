@@ -40,8 +40,8 @@ class ChatServer : noncopyable
  private:
   void onConnection(const TcpConnectionPtr& conn)
   {
-    LOG_INFO << conn->localAddress().toIpPort() << " -> "
-        << conn->peerAddress().toIpPort() << " is "
+    LOG_INFO << conn->peerAddress().toIpPort() << " -> "
+        << conn->localAddress().toIpPort() << " is "
         << (conn->connected() ? "UP" : "DOWN");
 
     MutexLockGuard lock(mutex_);
@@ -68,7 +68,7 @@ class ChatServer : noncopyable
                        const string& message,
                        Timestamp)
   {
-    ConnectionListPtr connections = getConnectionList();;
+    ConnectionListPtr connections = getConnectionList();
     for (ConnectionList::iterator it = connections->begin();
         it != connections->end();
         ++it)
