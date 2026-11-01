@@ -222,16 +222,30 @@ BOOST_AUTO_TEST_CASE(testLogStreamLong)
   {
     os << "123456789 ";
     BOOST_CHECK_EQUAL(buf.length(), 10*(i+1));
-    BOOST_CHECK_EQUAL(buf.avail(), 4000 - 10*(i+1));
+    BOOST_CHECK_EQUAL(buf.avail(), muduo::detail::kSmallBuffer - 10*(i+1));
   }
 
-  os << "abcdefghi ";
-  BOOST_CHECK_EQUAL(buf.length(), 3990);
-  BOOST_CHECK_EQUAL(buf.avail(), 10);
+  const string tail(static_cast<size_t>(buf.avail()), 'x');
+  os << tail;
+  BOOST_CHECK_EQUAL(buf.length(), muduo::detail::kSmallBuffer);
+  BOOST_CHECK_EQUAL(buf.avail(), 0);
+  BOOST_CHECK_EQUAL(buf.toString().substr(3990), tail);
 
-  os << "abcdefghi";
-  BOOST_CHECK_EQUAL(buf.length(), 3999);
-  BOOST_CHECK_EQUAL(buf.avail(), 1);
+  const string full = buf.toString();
+  os << "ignored";
+  BOOST_CHECK_EQUAL(buf.toString(), full);
+
+  os.resetBuffer();
+  const string prefix(static_cast<size_t>(muduo::detail::kSmallBuffer - 3), 'p');
+  os << prefix << "abcdef";
+  BOOST_CHECK_EQUAL(buf.toString(), prefix + "abc");
+  BOOST_CHECK_EQUAL(buf.avail(), 0);
+
+  os.resetBuffer();
+  os.append("", 0);
+  BOOST_CHECK_EQUAL(buf.length(), 0);
+  os << string(static_cast<size_t>(muduo::detail::kSmallBuffer + 1), 'z');
+  BOOST_CHECK_EQUAL(buf.toString(), string(static_cast<size_t>(muduo::detail::kSmallBuffer), 'z'));
 }
 
 BOOST_AUTO_TEST_CASE(testFormatSI)
