@@ -28,7 +28,9 @@ def expect_regression(label, *args):
     if result.returncode == 0:
         raise RuntimeError(f"Negative control unexpectedly passed: {label}")
     # Require an actual test failure, not a loader or sanitizer startup failure.
-    if "AsyncLogging_unittest.cc:" not in result.stderr and "error: in" not in result.stdout:
+    if ("AsyncLogging_unittest.cc:" not in result.stderr
+            and "Logging_unittest:" not in result.stderr
+            and "error: in" not in result.stdout):
         raise RuntimeError(f"Negative control failed outside its assertions: {label}")
 
 
@@ -48,6 +50,18 @@ if sys.argv[1] == "pull_request_fix_bug":
     for scenario in ("empty", "inflight"):
         expect_regression(f"original do-while {scenario}", str(BIN / "asynclogging_unittest"), scenario)
 else:
+    logging = Path("muduo/base/Logging.cc")
+    logging.write_text(logging.read_text().replace(
+        '  stream_ << " - " << basename_ << \':\' << line_;\n'
+        '  stream_.appendEndOfLine();',
+        '  stream_ << " - " << basename_ << \':\' << line_ << \'\\n\';',
+    ))
+    rebuild("logging_unittest")
+    expect_regression(
+        "truncated record without its newline",
+        str(BIN / "logging_unittest"),
+    )
+
     restore("muduo/base/LogStream.h")
     rebuild("logstream_test")
     expect_regression(

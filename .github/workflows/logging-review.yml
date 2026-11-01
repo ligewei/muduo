@@ -52,10 +52,13 @@ jobs:
           if [ -f muduo/base/tests/AsyncLogging_unittest.cc ]; then
             targets+=(asynclogging_unittest)
           fi
+          if [ -f muduo/base/tests/Logging_unittest.cc ]; then
+            targets+=(logging_unittest)
+          fi
           cmake --build build-review --parallel 2 --target "${targets[@]}"
       - name: Run regression tests
         working-directory: source
-        run: ctest --test-dir build-review --output-on-failure -R '^(logstream_test|asynclogging_shutdown_.*)$'
+        run: ctest --test-dir build-review --output-on-failure -R '^(logstream_test|logging_unittest|asynclogging_shutdown_.*)$'
       - name: Verify tests reject upstream and original fixes
         if: matrix.compiler == 'g++' && matrix.build_type == 'Debug'
         working-directory: source
