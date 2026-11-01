@@ -222,30 +222,60 @@ BOOST_AUTO_TEST_CASE(testLogStreamLong)
   {
     os << "123456789 ";
     BOOST_CHECK_EQUAL(buf.length(), 10*(i+1));
-    BOOST_CHECK_EQUAL(buf.avail(), muduo::detail::kSmallBuffer - 10*(i+1));
+    BOOST_CHECK_EQUAL(buf.avail(), 4000 - 10*(i+1));
   }
 
-  const string tail(static_cast<size_t>(buf.avail()), 'x');
-  os << tail;
-  BOOST_CHECK_EQUAL(buf.length(), muduo::detail::kSmallBuffer);
-  BOOST_CHECK_EQUAL(buf.avail(), 0);
-  BOOST_CHECK_EQUAL(buf.toString().substr(3990), tail);
+  os << "abcdefghi ";
+  BOOST_CHECK_EQUAL(buf.length(), 3999);
+  BOOST_CHECK_EQUAL(buf.avail(), 1);
+  BOOST_CHECK_EQUAL(buf.toString().substr(3990), string("abcdefghi"));
 
-  const string full = buf.toString();
-  os << "ignored";
-  BOOST_CHECK_EQUAL(buf.toString(), full);
+  os << "abcdefghi";
+  BOOST_CHECK_EQUAL(buf.length(), 3999);
+  BOOST_CHECK_EQUAL(buf.avail(), 1);
+}
 
-  os.resetBuffer();
-  const string prefix(static_cast<size_t>(muduo::detail::kSmallBuffer - 3), 'p');
-  os << prefix << "abcdef";
-  BOOST_CHECK_EQUAL(buf.toString(), prefix + "abc");
-  BOOST_CHECK_EQUAL(buf.avail(), 0);
+BOOST_AUTO_TEST_CASE(testFixedBufferTruncation)
+{
+  muduo::LogStream::Buffer buf;
+  const size_t capacity = static_cast<size_t>(muduo::detail::kSmallBuffer);
+  const string payload(capacity - 1, 'x');
 
-  os.resetBuffer();
-  os.append("", 0);
+  // Exactly fill the usable space, preserving the byte used by debugString().
+  buf.append(payload.data(), payload.size());
+  BOOST_CHECK_EQUAL(buf.toString(), payload);
+  BOOST_CHECK_EQUAL(buf.avail(), 1);
+  BOOST_CHECK_EQUAL(string(buf.debugString()), payload);
+  BOOST_CHECK_EQUAL(buf.length(), muduo::detail::kSmallBuffer - 1);
+  buf.append("ignored", 7);
+  buf.append(NULL, 0);
+  BOOST_CHECK_EQUAL(buf.toString(), payload);
+
+  // Inputs equal to and larger than the physical capacity retain their prefix.
+  for (size_t extra = 0; extra < 2; ++extra)
+  {
+    buf.reset();
+    const string oversized(capacity + extra, 'x');
+    buf.append(oversized.data(), oversized.size());
+    BOOST_CHECK_EQUAL(buf.toString(), payload);
+    BOOST_CHECK_EQUAL(string(buf.debugString()), payload);
+    BOOST_CHECK_EQUAL(buf.avail(), 1);
+  }
+
+  buf.reset();
+  const string prefix(capacity - 3, 'p');
+  buf.append(prefix.data(), prefix.size());
+  buf.append("abcdef", 6);
+  BOOST_CHECK_EQUAL(buf.toString(), prefix + "ab");
+  BOOST_CHECK_EQUAL(string(buf.debugString()), prefix + "ab");
+  BOOST_CHECK_EQUAL(buf.avail(), 1);
+
+  buf.reset();
+  buf.append(NULL, 0);
   BOOST_CHECK_EQUAL(buf.length(), 0);
-  os << string(static_cast<size_t>(muduo::detail::kSmallBuffer + 1), 'z');
-  BOOST_CHECK_EQUAL(buf.toString(), string(static_cast<size_t>(muduo::detail::kSmallBuffer), 'z'));
+  BOOST_CHECK_EQUAL(string(buf.debugString()), string());
+  buf.append("reused", 6);
+  BOOST_CHECK_EQUAL(buf.toString(), string("reused"));
 }
 
 BOOST_AUTO_TEST_CASE(testFormatSI)

@@ -9,6 +9,7 @@
 #include "muduo/base/noncopyable.h"
 #include "muduo/base/StringPiece.h"
 #include "muduo/base/Types.h"
+#include <algorithm>
 #include <assert.h>
 #include <string.h> // memcpy
 
@@ -18,8 +19,8 @@ namespace muduo
 namespace detail
 {
 
-const int kSmallBuffer = 4096;
-const int kLargeBuffer = 4096*1024;
+const int kSmallBuffer = 4000;
+const int kLargeBuffer = 4000*1000;
 
 template<int SIZE>
 class FixedBuffer : noncopyable
@@ -38,16 +39,13 @@ class FixedBuffer : noncopyable
 
   void append(const char* /*restrict*/ buf, size_t len)
   {
-    if (implicit_cast<size_t>(avail()) > len)
+    // Keep one byte available for debugString()'s terminating NUL. Truncate
+    // oversized input to the remaining payload space instead of dropping it.
+    if (avail() > 1 && len > 0)
     {
-      memcpy(cur_, buf, len);
-      cur_ += len;
-    }
-    else
-    {
-      size_t avail_len = static_cast<size_t>(avail());
-      memcpy(cur_, buf, avail_len);
-      cur_ += avail_len;
+      const size_t n = std::min(len, static_cast<size_t>(avail() - 1));
+      memcpy(cur_, buf, n);
+      cur_ += n;
     }
   }
 
